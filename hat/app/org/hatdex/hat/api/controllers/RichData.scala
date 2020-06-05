@@ -29,6 +29,7 @@ import java.util.UUID
 import javax.inject.Inject
 import com.mohiva.play.silhouette.api.Silhouette
 import com.mohiva.play.silhouette.api.actions.SecuredRequest
+import io.dataswift.adjudicator.Types.ShortLivedToken
 import org.hatdex.hat.api.json.RichDataJsonFormats
 import org.hatdex.hat.api.models._
 import org.hatdex.hat.api.models.applications.HatApplication
@@ -385,6 +386,44 @@ class RichData @Inject() (
           case Some(debit) => Ok(Json.toJson(debit))
           case None        => BadRequest(Json.toJson(Errors.dataDebitDoesNotExist))
         }
+    }
+
+  /** Contract DATA */
+  /**
+   * Returns Data Records for a given endpoint
+   *
+   * @param namespace Namespace of the endpoint, typically restricted to a specific application
+   * @param endpoint Endpoint name within the namespace, any valid URL path
+   * @param orderBy Data Field within a data record by which data should be ordered
+   * @param ordering The ordering to use for data sorting - default is "ascending", set to "descending" for reverse order
+   * @param skip How many records to skip (used for paging)
+   * @param take How many data records to take - limits the number of results, could be used for paging responses
+   * @return HTTP Response with JSON-serialized data records or an error message
+   */
+
+  def getContractData(
+    namespace: String,
+    endpoint: String,
+    orderBy: Option[String],
+    ordering: Option[String],
+    skip: Option[Int],
+    take: Option[Int]): Action[AnyContent] =
+    SecuredAction(WithRole(Owner(), NamespaceRead(namespace)) || ContainsApplicationRole(Owner(), NamespaceRead(namespace))).async { implicit request =>
+      // 1. Get the header for the keyId
+      // 2. use sttp to ask for the public key, has to block
+      // 3. verify the request using the lib
+      // 4. if it's valid, run the request
+      val response = request.body match {
+        case slToken: ShortLivedToken => {}
+        case _ =>
+          List()
+      }
+
+      val dataEndpoint = s"$namespace/$endpoint"
+      val query = Seq(EndpointQuery(dataEndpoint, None, None, None))
+      val data = dataService.propertyData(query, orderBy, ordering.contains("descending"),
+        skip.getOrElse(0), take.orElse(Some(defaultRecordLimit)))
+      data.map(d => Ok(Json.toJson(d)))
     }
 
   private object Errors {

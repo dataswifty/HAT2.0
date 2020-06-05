@@ -29,6 +29,7 @@ object Dependencies {
   object Versions {
     val crossScala = Seq("2.12.11")
     val scalaVersion = crossScala.head
+    val adjudicator = "0.1.0-SNAPSHOT"
   }
 
   val resolvers = Seq(
@@ -100,5 +101,9 @@ object Dependencies {
     }
 
     val scalaGuice = "net.codingwell" %% "scala-guice" % "4.2.6"
+
+    object ContractLibrary {
+      val adjudicator = "io.dataswift" %% "adjudicatorlib" % Versions.adjudicator
+    }
   }
 }

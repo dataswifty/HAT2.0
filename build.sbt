@@ -39,7 +39,8 @@ lazy val hat = project
       Library.Utils.playMemcached,
       Library.Utils.elasticacheClusterClient,
       Library.Utils.alpakkaAwsLambda,
-      Library.scalaGuice
+      Library.scalaGuice,
+      Library.ContractLibrary.adjudicator
     ),
     libraryDependencies := (buildEnv.value match {
       case BuildEnv.Developement | BuildEnv.Test =>
@@ -54,6 +55,9 @@ lazy val hat = project
         libraryDependencies.value.map(excludeSpecs2)
     }),
     libraryDependencies += "org.codehaus.janino" % "janino" % "3.1.2",
+    libraryDependencies += "be.venneborg" %% "play27-refined" % "0.5.0",
+    libraryDependencies += "com.softwaremill.sttp.client" %% "core" % "2.1.5",
+    libraryDependencies += "com.softwaremill.sttp.client" %% "akka-http-backend" % "2.1.5",
     //libraryDependencies += "org.mockito" % "mockito-core" % "3.3.3" % Test,
     pipelineStages in Assets := Seq(digest),
     sourceDirectory in Assets := baseDirectory.value / "app" / "org" / "hatdex" / "hat" / "phata" / "assets",
@@ -93,4 +97,5 @@ lazy val hat = project
     codegenConfig in gentables := "dev.conf",
     codegenEvolutions in gentables := "devhatMigrations"
   )
+
 
