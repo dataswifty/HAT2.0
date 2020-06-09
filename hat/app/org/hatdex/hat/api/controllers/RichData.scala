@@ -29,6 +29,7 @@ import java.util.UUID
 import javax.inject.Inject
 import com.mohiva.play.silhouette.api.Silhouette
 import com.mohiva.play.silhouette.api.actions.SecuredRequest
+import io.dataswift.adjudicator.ShortLivedTokenOps
 import io.dataswift.adjudicator.Types.ShortLivedToken
 import org.hatdex.hat.api.json.RichDataJsonFormats
 import org.hatdex.hat.api.models._
@@ -38,11 +39,13 @@ import org.hatdex.hat.api.service.monitoring.HatDataEventDispatcher
 import org.hatdex.hat.api.service.richData._
 import org.hatdex.hat.authentication.models._
 import org.hatdex.hat.authentication.{ ContainsApplicationRole, HatApiAuthEnvironment, HatApiController, WithRole }
-import org.hatdex.hat.utils.{ HatBodyParsers, LoggingProvider }
+import org.hatdex.hat.utils.{ HatBodyParsers, LoggingProvider, NetworkRequest }
 import play.api.libs.json.{ JsArray, JsValue, Json }
 import play.api.mvc._
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.duration._
+import scala.concurrent.{ Await, ExecutionContext, Future }
+import scala.util.{ Failure, Success }
 import scala.util.control.NonFatal
 
 class RichData @Inject() (
@@ -414,9 +417,24 @@ class RichData @Inject() (
       // 3. verify the request using the lib
       // 4. if it's valid, run the request
       val response = request.body match {
-        case slToken: ShortLivedToken => {}
-        case _ =>
-          List()
+        case slToken: ShortLivedToken => {
+          ShortLivedTokenOps.getKeyId(slToken.toString) match {
+            case Success(keyId) => {
+              println(keyId)
+              val fut = org.hatdex.hat.utils.NetworkRequest.getPublicKey(keyId)
+              val response = Await.ready(fut, 10.seconds)
+              println(response)
+              Ok("all good")
+            }
+            case Failure(exception) => {
+              logger.error("Jank ass Short Lived Token")
+              BadRequest(NotFound)
+            }
+          }
+        }
+        case _ => {
+          BadRequest(NotFound)
+        }
       }
 
       val dataEndpoint = s"$namespace/$endpoint"

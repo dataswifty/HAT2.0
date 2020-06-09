@@ -48,26 +48,10 @@ class NetworkRequestSpec extends Specification {
   """
 
   def e4 = {
-    val nr = new NetworkRequest()
-    val fut = nr.run()
+    val fut = NetworkRequest.run()
     val response = Await.ready(fut, 10.seconds)
     println(response)
     "Hello world" must endWith("world")
   }
 }
-
-//  extends Specification {
-//
-//  val logger = Logger(this.getClass)
-//
-//  "The `profile` method" should {
-//    "Return bundle data with profile information" in {
-//      val nr = new NetworkRequest()
-//
-//      nr.run()
-//
-//      (5) must be equalTo 5
-//    }
-//  }
-//}
 

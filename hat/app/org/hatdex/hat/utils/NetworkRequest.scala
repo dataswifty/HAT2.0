@@ -3,15 +3,21 @@ package org.hatdex.hat.utils
 import sttp.client._
 import sttp.client.akkahttp._
 
-class NetworkRequest {
+import scala.concurrent.Future
+
+object NetworkRequest {
   implicit val backend = AkkaHttpBackend()
 
+  def getPublicKey(keyId: String): Future[Response[Either[String, String]]] = {
+    val url = s"http://localhost:8080/${keyId}"
+    val request = basicRequest.get(uri"${url}")
 
+    request.send()
+  }
 
   def run() = {
-    val keyId = "http language:scala"
-    val request = basicRequest.get(
-      uri"https://api.github.com/search/repositories?q=$query")
+
+    val request = basicRequest.get(uri"http://localhost:8080/")
 
     request.send()
 
