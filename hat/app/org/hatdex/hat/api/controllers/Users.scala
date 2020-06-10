@@ -25,9 +25,10 @@
 package org.hatdex.hat.api.controllers
 
 import java.util.UUID
-import javax.inject.Inject
 
+import javax.inject.Inject
 import com.mohiva.play.silhouette.api.Silhouette
+import io.dataswift.adjudicator.Types.ContractId
 import org.hatdex.hat.api.json.HatJsonFormats
 import org.hatdex.hat.api.models.{ Owner, Platform, _ }
 import org.hatdex.hat.api.service.UsersService
@@ -38,6 +39,7 @@ import org.hatdex.hat.dal.ModelTranslation
 import org.hatdex.hat.utils.HatBodyParsers
 import play.api.Logger
 import play.api.libs.json.Json
+import play.api.libs.ws.WSClient
 import play.api.mvc._
 
 import scala.concurrent.{ ExecutionContext, Future }
@@ -48,7 +50,7 @@ class Users @Inject() (
     usersService: UsersService,
     hatBodyParsers: HatBodyParsers,
     implicit val ec: ExecutionContext,
-    implicit val applicationsService: ApplicationsService) extends HatApiController(components, silhouette) with HatJsonFormats {
+    implicit val applicationsService: ApplicationsService)(ws: WSClient) extends HatApiController(components, silhouette) with HatJsonFormats {
 
   private val logger = Logger(this.getClass)
 
@@ -161,4 +163,29 @@ class Users @Inject() (
       }
     }
 
+  def joinContract(hatName: String, contractId: ContractId) = {
+    org.hatdex.hat.utils.NetworkRequest.joinContract(hatName, contractId, ws).map { resp =>
+      resp.status match {
+        case OK => {
+          None
+        }
+        case _ => {
+          Some("join contract failure")
+        }
+      }
+    }
+  }
+
+  def leaveContract(hatName: String, contractId: ContractId): Future[Option[String]] = {
+    org.hatdex.hat.utils.NetworkRequest.leaveContract(hatName, contractId, ws).map { resp =>
+      resp.status match {
+        case OK => {
+          None
+        }
+        case _ => {
+          Some("leave contract failure")
+        }
+      }
+    }
+  }
 }
