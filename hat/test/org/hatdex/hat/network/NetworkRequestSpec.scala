@@ -24,12 +24,13 @@
 
 package org.hatdex.hat.network.controllers
 
-import io.dataswift.adjudicator.Types.ContractId
+import io.dataswift.adjudicator.Types.{ Contract, ContractId }
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.mock.Mockito
 import play.api.Logger
 import org.hatdex.hat.utils._
 import play.api.test.{ PlaySpecification, WsTestClient }
+
 import scala.concurrent.duration._
 
 class NetworkRequestSpec(implicit ee: ExecutionEnv) extends PlaySpecification with Mockito {
@@ -39,18 +40,19 @@ class NetworkRequestSpec(implicit ee: ExecutionEnv) extends PlaySpecification wi
   sequential
 
   val hatName = "tylertesthat"
-  val contractId = ContractId(java.util.UUID.randomUUID())
+  val contractId = ContractId(java.util.UUID.fromString("6ed280aa-f2d7-4eb7-80f9-921578acb303"))
+  val contract = Contract(contractId)
 
   "The network" should {
-    "make a request to get the public key" in {
-      WsTestClient.withClient { client =>
-        val fut = NetworkRequest.getPublicKey("keyId", client)
-        fut.map { result =>
-          println(result)
-          true must be equalTo (true)
-        }.await(1, 10.seconds)
-      }
-    }
+    //    "make a request, telling adjudicator-service, to create a contract" in {
+    //      WsTestClient.withClient { client =>
+    //        val fut = NetworkRequest.createContract(contract, client)
+    //        fut.map { result =>
+    //          println(result)
+    //          true must be equalTo (true)
+    //        }.await(1, 10.seconds)
+    //      }
+    //    }
 
     "make a request, telling adjudicator-service, that the HAT is joining a contract" in {
       WsTestClient.withClient { client =>
@@ -62,15 +64,26 @@ class NetworkRequestSpec(implicit ee: ExecutionEnv) extends PlaySpecification wi
       }
     }
 
-    "make a request, telling adjudicator-service, that the HAT is joining a contract" in {
-      WsTestClient.withClient { client =>
-        val fut = NetworkRequest.leaveContract(hatName, contractId, client)
-        fut.map { result =>
-          println(result)
-          true must be equalTo (true)
-        }.await(1, 10.seconds)
-      }
-    }
+    //    "make a request, telling adjudicator-service, that the HAT is joining a contract" in {
+    //      WsTestClient.withClient { client =>
+    //        val fut = NetworkRequest.leaveContract(hatName, contractId, client)
+    //        fut.map { result =>
+    //          println(result)
+    //          true must be equalTo (true)
+    //        }.await(1, 10.seconds)
+    //      }
+    //    }
+    //
+    //    "make a request to get the public key" in {
+    //      WsTestClient.withClient { client =>
+    //        val fut = NetworkRequest.getPublicKey("keyId", client)
+    //        fut.map { result =>
+    //          println(result)
+    //          true must be equalTo (true)
+    //        }.await(1, 10.seconds)
+    //      }
+    //    }
+
   }
 }
 

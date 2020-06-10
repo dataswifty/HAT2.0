@@ -1,7 +1,8 @@
 package org.hatdex.hat.utils
 
-import io.dataswift.adjudicator.Types.ContractId
+import io.dataswift.adjudicator.Types.{ Contract, ContractId }
 import play.api.http.HttpVerbs
+import play.api.libs.json.Json
 import play.api.libs.ws.{ WSClient, WSRequest, WSResponse }
 
 import scala.concurrent.{ ExecutionContext, Future }
@@ -17,7 +18,13 @@ object NetworkRequest {
     println(url)
     val req = makeRequest(url, ws)
     req.get()
+  }
 
+  def createContract(contract: Contract, ws: WSClient)(implicit ec: ExecutionContext): Future[WSResponse] = {
+    val url = s"http://localhost:8080/v1/contracts"
+    println(url)
+    val req = makeRequest(url, ws)
+    req.post(s"""{"contract":"${contract.contractUUID}"}""")
   }
 
   def joinContract(hatName: String, contractId: ContractId, ws: WSClient)(implicit ec: ExecutionContext): Future[WSResponse] = {
