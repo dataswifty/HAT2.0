@@ -421,6 +421,7 @@ class RichData @Inject() (
               fut.map { resp =>
                 resp.status match {
                   case OK => {
+                    // Convert Array[Byte] to PublicKey, from the lib
                     ShortLivedTokenOps.verifyToken(contractDataRequest.token.toString, resp.body.getBytes()) match {
                       case Success(tok) => {
                         val dataEndpoint = s"$namespace/$endpoint"
