@@ -24,34 +24,30 @@
 
 package org.hatdex.hat.network.controllers
 
-import org.hatdex.hat.api.HATTestContext
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.mock.Mockito
-import org.specs2.specification.{ BeforeAll, BeforeEach }
 import play.api.Logger
-import play.api.libs.json.Json
-import play.api.test.{ FakeRequest, Helpers, PlaySpecification }
 
-import scala.concurrent.Await
-import scala.concurrent.duration._
 import org.hatdex.hat.utils._
-import org.specs2.Specification
+import play.api.test.{ PlaySpecification, WsTestClient }
+import scala.concurrent.duration._
 
-class NetworkRequestSpec extends Specification {
+class NetworkRequestSpec(implicit ee: ExecutionEnv) extends PlaySpecification with Mockito {
+
   val logger = Logger(this.getClass)
 
-  def is = s2"""
-  This is a specification for the 'Hello world' string
+  sequential
 
-  The 'Hello world' string should
-    contain 11 characters $e4
-  """
-
-  def e4 = {
-    val fut = NetworkRequest.run()
-    val response = Await.ready(fut, 10.seconds)
-    println(response)
-    "Hello world" must endWith("world")
+  "The network" should {
+    "Return `true` for internal status checks" in {
+      WsTestClient.withClient { client =>
+        val fut = NetworkRequest.getPublicKey("keyId", client)
+        fut.map { result =>
+          println(result)
+          true must be equalTo (true)
+        }.await(1, 10.seconds)
+      }
+    }
   }
 }
 

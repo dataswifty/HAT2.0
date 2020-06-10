@@ -30,7 +30,7 @@ import javax.inject.Inject
 import com.mohiva.play.silhouette.api.Silhouette
 import com.mohiva.play.silhouette.api.actions.SecuredRequest
 import io.dataswift.adjudicator.ShortLivedTokenOps
-import io.dataswift.adjudicator.Types.ShortLivedToken
+import io.dataswift.adjudicator.Types.{ ContractDataRequest, ShortLivedToken }
 import org.hatdex.hat.api.json.RichDataJsonFormats
 import org.hatdex.hat.api.models._
 import org.hatdex.hat.api.models.applications.HatApplication
@@ -42,6 +42,7 @@ import org.hatdex.hat.authentication.{ ContainsApplicationRole, HatApiAuthEnviro
 import org.hatdex.hat.utils.{ HatBodyParsers, LoggingProvider, NetworkRequest }
 import play.api.libs.json.{ JsArray, JsValue, Json }
 import play.api.mvc._
+import play.api.libs.ws._
 
 import scala.concurrent.duration._
 import scala.concurrent.{ Await, ExecutionContext, Future }
@@ -58,7 +59,7 @@ class RichData @Inject() (
     dataDebitService: DataDebitContractService,
     loggingProvider: LoggingProvider,
     implicit val ec: ExecutionContext,
-    implicit val applicationsService: ApplicationsService) extends HatApiController(components, silhouette) with RichDataJsonFormats {
+    implicit val applicationsService: ApplicationsService)(ws: WSClient) extends HatApiController(components, silhouette) with RichDataJsonFormats {
 
   private val logger = loggingProvider.logger(this.getClass)
   private val defaultRecordLimit = 1000
@@ -412,36 +413,75 @@ class RichData @Inject() (
     skip: Option[Int],
     take: Option[Int]): Action[AnyContent] =
     SecuredAction(WithRole(Owner(), NamespaceRead(namespace)) || ContainsApplicationRole(Owner(), NamespaceRead(namespace))).async { implicit request =>
-      // 1. Get the header for the keyId
-      // 2. use sttp to ask for the public key, has to block
-      // 3. verify the request using the lib
-      // 4. if it's valid, run the request
       val response = request.body match {
-        case slToken: ShortLivedToken => {
-          ShortLivedTokenOps.getKeyId(slToken.toString) match {
+        case contractDataRequest: ContractDataRequest => {
+          ShortLivedTokenOps.getKeyId(contractDataRequest.token.toString) match {
             case Success(keyId) => {
-              println(keyId)
-              val fut = org.hatdex.hat.utils.NetworkRequest.getPublicKey(keyId)
-              val response = Await.ready(fut, 10.seconds)
-              println(response)
-              Ok("all good")
+              val fut = org.hatdex.hat.utils.NetworkRequest.getPublicKey(keyId, ws)
+              fut.map { resp =>
+                resp.status match {
+                  case OK => {
+                    ShortLivedTokenOps.verifyToken(contractDataRequest.token.toString, resp.body.getBytes()) match {
+                      case Success(tok) => {
+                        val dataEndpoint = s"$namespace/$endpoint"
+                        val query = Seq(EndpointQuery(dataEndpoint, None, None, None))
+                        val data = dataService.propertyData(query, orderBy, ordering.contains("descending"),
+                          skip.getOrElse(0), take.orElse(Some(defaultRecordLimit)))
+                        data.map(d => Ok(Json.toJson(d)))
+                      }
+                      case _ => {
+                        logger.error("Failed to find a publicKey")
+                        NotFound
+                      }
+                    }
+                  }
+                  case _ => {
+                    logger.error("Failed to find a publicKey")
+                    NotFound
+                  }
+                }
+              }
+
+              //Ok("all good")
             }
             case Failure(exception) => {
-              logger.error("Jank ass Short Lived Token")
-              BadRequest(NotFound)
+              logger.error("Failed Short Lived Token")
+              NotFound
             }
           }
         }
         case _ => {
-          BadRequest(NotFound)
+          logger.error("Incorrect request body")
+          NotFound
         }
       }
 
+      Future.successful(Ok("ok"))
+    }
+
+  def saveEndpointData3(namespace: String, endpoint: String, skipErrors: Option[Boolean]): Action[JsValue] =
+    SecuredAction(WithRole(NamespaceWrite(namespace)) || ContainsApplicationRole(NamespaceWrite(namespace))).async(parsers.json[JsValue]) { implicit request =>
       val dataEndpoint = s"$namespace/$endpoint"
-      val query = Seq(EndpointQuery(dataEndpoint, None, None, None))
-      val data = dataService.propertyData(query, orderBy, ordering.contains("descending"),
-        skip.getOrElse(0), take.orElse(Some(defaultRecordLimit)))
-      data.map(d => Ok(Json.toJson(d)))
+      val response = request.body match {
+        case array: JsArray =>
+          // TODO: extract unique ID and timestamp
+          val values = array.value.map(EndpointData(dataEndpoint, None, None, None, _, None))
+          dataService.saveData(request.identity.userId, values, skipErrors.getOrElse(false))
+            .andThen(dataEventDispatcher.dispatchEventDataCreated(s"saved batch for $dataEndpoint"))
+            .map(saved => Created(Json.toJson(saved)))
+
+        case value: JsValue =>
+          // TODO: extract unique ID and timestamp
+          val values = Seq(EndpointData(dataEndpoint, None, None, None, value, None))
+          dataService.saveData(request.identity.userId, values)
+            .andThen(dataEventDispatcher.dispatchEventDataCreated(s"saved data for $dataEndpoint"))
+            .map(saved => Created(Json.toJson(saved.head)))
+      }
+
+      response recover {
+        case e: RichDataDuplicateException => BadRequest(Json.toJson(Errors.richDataDuplicate(e)))
+        case e: RichDataServiceException   => BadRequest(Json.toJson(Errors.richDataError(e)))
+      }
     }
 
   private object Errors {
