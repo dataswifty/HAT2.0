@@ -85,8 +85,8 @@ class ApplicationsServiceSpec(implicit ee: ExecutionEnv) extends PlaySpecificati
     "Include setup applications" in {
       val service = application.injector.instanceOf[ApplicationsService]
       val result = for {
-        _ ← service.setup(HatApplication(notablesApp, setup = false, enabled = false, active = false, None, None, None))
-        apps ← service.applicationStatus()
+        _ <- service.setup(HatApplication(notablesApp, setup = false, enabled = false, active = false, None, None, None))
+        apps <- service.applicationStatus()
       } yield {
         apps.length must be equalTo 5
         apps.find(_.application.id == notablesAppDebitless.id) must beSome
@@ -105,7 +105,7 @@ class ApplicationsServiceSpec(implicit ee: ExecutionEnv) extends PlaySpecificati
     "Provide status for a specific application" in {
       val service = application.injector.instanceOf[ApplicationsService]
       val result = for {
-        app ← service.applicationStatus(notablesApp.id)
+        app <- service.applicationStatus(notablesApp.id)
       } yield {
         app must beSome
         app.get.application.id must be equalTo notablesApp.id
@@ -117,7 +117,7 @@ class ApplicationsServiceSpec(implicit ee: ExecutionEnv) extends PlaySpecificati
     "Return `None` when application is not found by ID" in {
       val service = application.injector.instanceOf[ApplicationsService]
       val result = for {
-        app ← service.applicationStatus("randomid")
+        app <- service.applicationStatus("randomid")
       } yield {
         app must beNone
       }
@@ -128,7 +128,7 @@ class ApplicationsServiceSpec(implicit ee: ExecutionEnv) extends PlaySpecificati
     "Return `active=false` status for Internal status check apps that are not setup" in {
       val service = application.injector.instanceOf[ApplicationsService]
       val result = for {
-        app ← service.applicationStatus(notablesApp.id)
+        app <- service.applicationStatus(notablesApp.id)
       } yield {
         app must beSome
         app.get.active must beFalse
@@ -141,9 +141,9 @@ class ApplicationsServiceSpec(implicit ee: ExecutionEnv) extends PlaySpecificati
       val service = application.injector.instanceOf[ApplicationsService]
       val dataService = application.injector.instanceOf[RichDataService]
       val result = for {
-        app ← service.applicationStatus(notablesApp.id)
-        _ ← service.setup(app.get)
-        _ ← dataService.saveData(
+        app <- service.applicationStatus(notablesApp.id)
+        _ <- service.setup(app.get)
+        _ <- dataService.saveData(
           owner.userId,
           Seq(EndpointData(notablesApp.status.recentDataCheckEndpoint.get, None, None, None,
             JsObject(Map("test" -> JsString("test"))), None)), skipErrors = true)
@@ -161,9 +161,9 @@ class ApplicationsServiceSpec(implicit ee: ExecutionEnv) extends PlaySpecificati
     "Return `active=false` status for External status check apps that are setup but respond with wrong status" in {
       val service = application.injector.instanceOf[ApplicationsService]
       val result = for {
-        app ← service.applicationStatus(notablesAppExternalFailing.id)
-        _ ← service.setup(app.get)
-        setup ← service.applicationStatus(notablesAppExternalFailing.id)
+        app <- service.applicationStatus(notablesAppExternalFailing.id)
+        _ <- service.setup(app.get)
+        setup <- service.applicationStatus(notablesAppExternalFailing.id)
       } yield {
         setup must beSome
         setup.get.setup must beTrue
@@ -208,11 +208,11 @@ class ApplicationsServiceSpec(implicit ee: ExecutionEnv) extends PlaySpecificati
       val dataDebitService = application.injector.instanceOf[DataDebitService]
       val cache = application.injector.instanceOf[AsyncCacheApi]
       val result = for {
-        app ← service.applicationStatus(notablesApp.id)
-        _ ← service.setup(app.get)(hatServer, owner, fakeRequest)
-        _ ← dataDebitService.dataDebitDisable(app.get.application.dataDebitId.get, cancelAtPeriodEnd = false)
-        _ ← cache.remove(service.appCacheKey(app.get.application.id)) //cache.remove(s"apps:${hatServer.domain}:${app.get.application.id}")
-        what ← cache.get(service.appCacheKey(app.get.application.id))
+        app <- service.applicationStatus(notablesApp.id)
+        _ <- service.setup(app.get)(hatServer, owner, fakeRequest)
+        _ <- dataDebitService.dataDebitDisable(app.get.application.dataDebitId.get, cancelAtPeriodEnd = false)
+        _ <- cache.remove(service.appCacheKey(app.get.application.id)) //cache.remove(s"apps:${hatServer.domain}:${app.get.application.id}")
+        what <- cache.get(service.appCacheKey(app.get.application.id))
         setup <- service.applicationStatus(app.get.application.id)
       } yield {
         setup must beSome
@@ -258,7 +258,7 @@ class ApplicationsServiceSpec(implicit ee: ExecutionEnv) extends PlaySpecificati
     "Return failure for a made-up Application Information" in {
       val service = application.injector.instanceOf[ApplicationsService]
       val result = for {
-        setup ← service.setup(HatApplication(notablesAppMissing, true, true, true, None, None, None))
+        setup <- service.setup(HatApplication(notablesAppMissing, true, true, true, None, None, None))
       } yield setup
 
       result must throwA[RuntimeException].await(1, 20.seconds)
@@ -270,10 +270,10 @@ class ApplicationsServiceSpec(implicit ee: ExecutionEnv) extends PlaySpecificati
       val service = application.injector.instanceOf[ApplicationsService]
       val dataDebitService = application.injector.instanceOf[DataDebitService]
       val result = for {
-        app ← service.applicationStatus(notablesApp.id)
-        _ ← service.setup(app.get)
-        setup ← service.disable(app.get)
-        dd ← dataDebitService.dataDebit(app.get.application.dataDebitId.get)
+        app <- service.applicationStatus(notablesApp.id)
+        _ <- service.setup(app.get)
+        setup <- service.disable(app.get)
+        dd <- dataDebitService.dataDebit(app.get.application.dataDebitId.get)
       } yield {
         setup.active must beFalse
         dd must beSome
@@ -286,9 +286,9 @@ class ApplicationsServiceSpec(implicit ee: ExecutionEnv) extends PlaySpecificati
     "Disable an application without a data debit" in {
       val service = application.injector.instanceOf[ApplicationsService]
       val result = for {
-        app ← service.applicationStatus(notablesAppDebitless.id)
-        _ ← service.setup(app.get)
-        setup ← service.disable(app.get)
+        app <- service.applicationStatus(notablesAppDebitless.id)
+        _ <- service.setup(app.get)
+        setup <- service.disable(app.get)
       } yield {
         setup.active must beFalse
       }
@@ -299,7 +299,7 @@ class ApplicationsServiceSpec(implicit ee: ExecutionEnv) extends PlaySpecificati
     "Return failure for a made-up Application Information" in {
       val service = application.injector.instanceOf[ApplicationsService]
       val result = for {
-        setup ← service.disable(HatApplication(notablesAppMissing, true, true, true, None, None, None))
+        setup <- service.disable(HatApplication(notablesAppMissing, true, true, true, None, None, None))
       } yield setup
 
       result must throwA[RuntimeException].await(1, 20.seconds)
@@ -311,7 +311,7 @@ class ApplicationsServiceSpec(implicit ee: ExecutionEnv) extends PlaySpecificati
 
       val service = application.injector.instanceOf[ApplicationsService]
       val result = for {
-        token ← service.applicationToken(owner, notablesApp)
+        token <- service.applicationToken(owner, notablesApp)
       } yield {
         token.accessToken mustNotEqual ""
         val encoder = new Base64AuthenticatorEncoder()
@@ -330,10 +330,10 @@ class ApplicationsServiceSpec(implicit ee: ExecutionEnv) extends PlaySpecificati
 
   "The `ApplicationStatusCheckService` `status` method" should {
     "Return `true` for internal status checks" in {
-      withMockWsClient { client ⇒
+      withMockWsClient { client =>
         val service = new ApplicationStatusCheckService(client)(remoteEC)
         service.status(ApplicationStatus.Internal(Version("1.0.0"), None, None, None, DateTime.now()), "token")
-          .map { result ⇒
+          .map { result =>
             result must beTrue
           }
           .await(1, 10.seconds)
@@ -341,10 +341,10 @@ class ApplicationsServiceSpec(implicit ee: ExecutionEnv) extends PlaySpecificati
     }
 
     "Return `true` for external check with matching status" in {
-      withMockWsClient { client ⇒
+      withMockWsClient { client =>
         val service = new ApplicationStatusCheckService(client)(remoteEC)
         service.status(ApplicationStatus.External(Version("1.0.0"), "/status", 200, None, None, None, DateTime.now()), "token")
-          .map { result ⇒
+          .map { result =>
             result must beTrue
           }
           .await(1, 10.seconds)
@@ -352,10 +352,10 @@ class ApplicationsServiceSpec(implicit ee: ExecutionEnv) extends PlaySpecificati
     }
 
     "Return `false` for external check with non-matching status" in {
-      withMockWsClient { client ⇒
+      withMockWsClient { client =>
         val service = new ApplicationStatusCheckService(client)(remoteEC)
         service.status(ApplicationStatus.External(Version("1.0.0"), "/failing", 200, None, None, None, DateTime.now()), "token")
-          .map { result ⇒
+          .map { result =>
             result must beFalse
           }
           .await(1, 10.seconds)

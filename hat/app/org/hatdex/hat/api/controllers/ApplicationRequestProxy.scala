@@ -55,23 +55,23 @@ class ApplicationRequestProxy @Inject() (
 
   def proxyRequest(id: String, path: String, method: String = "GET"): Action[AnyContent] = SecuredAction(ContainsApplicationRole(Owner(), ApplicationManage(id)) || WithRole(Owner())).async { implicit request =>
     logger.info(s"Proxy $method request for $id to $path with parameters: ${request.queryString}")
-    applicationsService.applicationStatus(id).flatMap { maybeStatus ⇒
+    applicationsService.applicationStatus(id).flatMap { maybeStatus =>
       maybeStatus map {
-        case HatApplication(app, _, true, _, _, _, _) ⇒
+        case HatApplication(app, _, true, _, _, _, _) =>
 
           applicationsService.applicationToken(request.identity, app)
-            .flatMap { token ⇒
+            .flatMap { token =>
               val baseRequest = wsClient.url(s"${app.kind.url}/$path")
-                .withHttpHeaders("x-auth-token" → token.accessToken)
-                .addQueryStringParameters(request.queryString.map(p ⇒ (p._1, p._2.head)).toSeq: _*)
+                .withHttpHeaders("x-auth-token" -> token.accessToken)
+                .addQueryStringParameters(request.queryString.map(p => (p._1, p._2.head)).toSeq: _*)
                 .withMethod(method)
 
-              request.body.asJson.fold(baseRequest)(b ⇒ baseRequest.withBody(b))
+              request.body.asJson.fold(baseRequest)(b => baseRequest.withBody(b))
                 .stream()
-                .map(r ⇒ new Status(r.status).sendEntity(HttpEntity.Strict(r.bodyAsBytes, Some("application/json"))))
+                .map(r => new Status(r.status).sendEntity(HttpEntity.Strict(r.bodyAsBytes, Some("application/json"))))
             }
 
-        case _ ⇒ Future.successful(BadRequest(Json.toJson(ErrorMessage(
+        case _ => Future.successful(BadRequest(Json.toJson(ErrorMessage(
           "Application not active",
           s"Application $id does not appear to be activated by the user"))))
       } getOrElse {

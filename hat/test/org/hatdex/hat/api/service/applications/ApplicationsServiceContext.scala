@@ -250,9 +250,9 @@ trait ApplicationsServiceContext extends HATTestContext {
       override def answer(invocation: InvocationOnMock) = {
         val s = invocation.getArguments()(0).asInstanceOf[ApplicationStatus.Status]
         s match {
-          case ApplicationStatus.Internal(_, _, _, _, _) ⇒ Future.successful(true)
-          case ApplicationStatus.External(_, "/status", _, _, _, _, _) ⇒ Future.successful(true)
-          case _ ⇒ Future.successful(false)
+          case ApplicationStatus.Internal(_, _, _, _, _) => Future.successful(true)
+          case ApplicationStatus.External(_, "/status", _, _, _, _, _) => Future.successful(true)
+          case _ => Future.successful(false)
         }
       }
     }

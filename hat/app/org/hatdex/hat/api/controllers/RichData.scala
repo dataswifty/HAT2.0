@@ -115,7 +115,7 @@ class RichData @Inject() (
 
   def saveBatchData: Action[Seq[EndpointData]] =
     SecuredAction(WithRole(DataCredit(""), Owner()) || ContainsApplicationRole(NamespaceWrite("*"), Owner())).async(parsers.json[Seq[EndpointData]]) { implicit request =>
-      val response = request2ApplicationStatus(request).flatMap { maybeAppStatus ⇒
+      val response = request2ApplicationStatus(request).flatMap { maybeAppStatus =>
         if (authorizeEndpointDataWrite(request.body, maybeAppStatus)) {
           dataService.saveData(request.identity.userId, request.body)
             .andThen(dataEventDispatcher.dispatchEventDataCreated(s"saved batch data"))
@@ -186,21 +186,21 @@ class RichData @Inject() (
   def deleteDataRecords(records: Seq[UUID]): Action[AnyContent] =
     SecuredAction(WithRole(DataCredit(""), Owner()) || ContainsApplicationRole(NamespaceWrite("*"), Owner())).async { implicit request =>
       val eventualPermissionContext = for {
-        maybeAppStatus ← request2ApplicationStatus(request)
-        recordNamespaces ← dataService.uniqueRecordNamespaces(records)
+        maybeAppStatus <- request2ApplicationStatus(request)
+        recordNamespaces <- dataService.uniqueRecordNamespaces(records)
       } yield (maybeAppStatus, recordNamespaces)
 
       eventualPermissionContext flatMap {
-        case (Some(appStatus), requiredNamespaces) if requiredNamespaces.forall(n ⇒ ContainsApplicationRole.isAuthorized(request.identity, appStatus, request.authenticator, NamespaceWrite(n))) ⇒
+        case (Some(appStatus), requiredNamespaces) if requiredNamespaces.forall(n => ContainsApplicationRole.isAuthorized(request.identity, appStatus, request.authenticator, NamespaceWrite(n))) =>
           dataService.deleteRecords(request.identity.userId, records) map { _ =>
             Ok(Json.toJson(SuccessResponse(s"All records deleted")))
           } recover {
             case RichDataMissingException(message, _) => BadRequest(Json.toJson(Errors.dataDeleteMissing(message)))
           }
-        case (Some(_), _) ⇒
+        case (Some(_), _) =>
           Future.successful(Forbidden(Json.toJson(Errors.forbidden("Permissions to modify records in some of the namespaces missing"))))
         // TODO: remove after non-application tokens are phased out
-        case (None, _) ⇒
+        case (None, _) =>
           dataService.deleteRecords(request.identity.userId, records) map { _ =>
             Ok(Json.toJson(SuccessResponse(s"All records deleted")))
           } recover {
@@ -219,7 +219,7 @@ class RichData @Inject() (
   def updateRecords(): Action[Seq[EndpointData]] =
     SecuredAction(WithRole(DataCredit(""), Owner()) || ContainsApplicationRole(NamespaceWrite("*"), Owner()))
       .async(parsers.json[Seq[EndpointData]]) { implicit request =>
-        request2ApplicationStatus(request).flatMap { maybeAppStatus ⇒
+        request2ApplicationStatus(request).flatMap { maybeAppStatus =>
           if (authorizeEndpointDataWrite(request.body, maybeAppStatus)) {
             dataService.updateRecords(request.identity.userId, request.body) map { saved =>
               Created(Json.toJson(saved))

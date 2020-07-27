@@ -53,14 +53,14 @@ class ApplicationStatusCheckService @Inject() (wsClient: WSClient)(implicit val 
 
   def status(statusCheck: ApplicationStatus.Status, token: String): Future[Boolean] = {
     statusCheck match {
-      case _: ApplicationStatus.Internal ⇒ Future.successful(true)
-      case s: ApplicationStatus.External ⇒ status(s, token)
+      case _: ApplicationStatus.Internal => Future.successful(true)
+      case s: ApplicationStatus.External => status(s, token)
     }
   }
 
   protected def status(statusCheck: ApplicationStatus.External, token: String): Future[Boolean] = {
     wsClient.url(statusCheck.statusUrl)
-      .withHttpHeaders("x-auth-token" → token)
+      .withHttpHeaders("x-auth-token" -> token)
       .withRequestTimeout(5000.millis)
       .get()
       .map(_.status == statusCheck.expectedStatus)
@@ -87,17 +87,17 @@ class ApplicationsService @Inject() (
     }
     else { Future.successful(Done) }
     for {
-      _ ← eventuallyCleanedCache
-      application ← cache.get[HatApplication](appCacheKey(id))
+      _ <- eventuallyCleanedCache
+      application <- cache.get[HatApplication](appCacheKey(id))
         .flatMap {
-          case Some(application) ⇒ Future.successful(Some(application))
-          case None ⇒
+          case Some(application) => Future.successful(Some(application))
+          case None =>
             cache.remove(s"apps:${hat.domain}") // if any item has expired, the aggregated statuses must be refreshed
             for {
               maybeApp <- trustedApplicationProvider.application(id)
               setup <- applicationSetupStatus(id)(hat.db)
               status <- FutureTransformations.transform(maybeApp.map(refetchApplicationsStatus(_, Seq(setup).flatten)))
-              _ ← status.map(s ⇒ cache.set(appCacheKey(id), s._1, applicationsCacheDuration)).getOrElse(Future.successful(Done))
+              _ <- status.map(s => cache.set(appCacheKey(id), s._1, applicationsCacheDuration)).getOrElse(Future.successful(Done))
             } yield status.map(_._1)
         }
     } yield application
@@ -106,13 +106,13 @@ class ApplicationsService @Inject() (
   def applicationStatus()(implicit hat: HatServer, user: HatUser, requestHeader: RequestHeader): Future[Seq[HatApplication]] = {
     cache.get[Seq[HatApplication]](s"apps:${hat.domain}")
       .flatMap({
-        case Some(applications) ⇒ Future.successful(applications)
-        case None ⇒
+        case Some(applications) => Future.successful(applications)
+        case None =>
           for {
-            apps ← trustedApplicationProvider.applications // potentially caching
-            setup ← applicationSetupStatus()(hat.db) // database
-            statuses ← Future.sequence(apps.map(refetchApplicationsStatus(_, setup)))
-            _ ← if (statuses.forall(_._2)) { cache.set(s"apps:${hat.domain}", statuses.unzip._1, applicationsCacheDuration) } else { Future.successful(Done) }
+            apps <- trustedApplicationProvider.applications // potentially caching
+            setup <- applicationSetupStatus()(hat.db) // database
+            statuses <- Future.sequence(apps.map(refetchApplicationsStatus(_, setup)))
+            _ <- if (statuses.forall(_._2)) { cache.set(s"apps:${hat.domain}", statuses.unzip._1, applicationsCacheDuration) } else { Future.successful(Done) }
           } yield statuses.unzip._1
       })
   }
@@ -121,34 +121,34 @@ class ApplicationsService @Inject() (
     val aSetup = setup.find(_.id == app.id)
     Utils.timeFuture(s"${hat.domain} ${app.id} status", logger)(collectStatus(app, aSetup))
       .andThen {
-        case Success((a, true)) ⇒ cache.set(appCacheKey(a.application.id), a, applicationsCacheDuration)
+        case Success((a, true)) => cache.set(appCacheKey(a.application.id), a, applicationsCacheDuration)
       }
   }
 
   def setup(application: HatApplication)(implicit hat: HatServer, user: HatUser, requestHeader: RequestHeader): Future[HatApplication] = {
     // Create and enable the data debit
     val maybeDataDebitSetup: Option[Future[DataDebit]] = for {
-      ddId ← application.application.dataDebitId
-      ddsRequest ← application.application.dataDebitSetupRequest
+      ddId <- application.application.dataDebitId
+      ddsRequest <- application.application.dataDebitSetupRequest
     } yield {
       logger.debug(s"Enable data debit $ddId for ${application.application.id}")
       for {
-        dds ← dataDebitService.createDataDebit(ddId, ddsRequest, user.userId)(hat)
+        dds <- dataDebitService.createDataDebit(ddId, ddsRequest, user.userId)(hat)
           .recoverWith({
-            case _: RichDataDuplicateDebitException ⇒
+            case _: RichDataDuplicateDebitException =>
               dataDebitService.updateDataDebitInfo(ddId, ddsRequest)(hat)
-                .flatMap(_ ⇒ dataDebitService.updateDataDebitPermissions(ddId, ddsRequest, user.userId)(hat))
+                .flatMap(_ => dataDebitService.updateDataDebitPermissions(ddId, ddsRequest, user.userId)(hat))
           })
-        _ ← dataDebitService.dataDebitEnableNewestPermissions(ddId)(hat)
+        _ <- dataDebitService.dataDebitEnableNewestPermissions(ddId)(hat)
       } yield dds
     }
 
     // Set up the app
     val appSetup = for {
-      _ ← maybeDataDebitSetup.getOrElse(Future.successful(())) // If data debit was there, must have been setup successfully
-      _ ← applicationSetupStatusUpdate(application, enabled = true)(hat.db) // Update status
+      _ <- maybeDataDebitSetup.getOrElse(Future.successful(())) // If data debit was there, must have been setup successfully
+      _ <- applicationSetupStatusUpdate(application, enabled = true)(hat.db) // Update status
       _ <- statsReporter.registerOwnerConsent(application.application.id)
-      app ← applicationStatus(application.application.id, bustCache = true) // Refetch all information
+      app <- applicationStatus(application.application.id, bustCache = true) // Refetch all information
         .map(_.getOrElse(throw new RuntimeException("Application information not found during setup")))
     } yield {
       logger.debug(s"Application status for ${app.application.id}: active = ${app.active}, setup = ${app.setup}, needs updating = ${app.needsUpdating}")
@@ -156,17 +156,17 @@ class ApplicationsService @Inject() (
     }
 
     appSetup.recoverWith {
-      case e: RuntimeException ⇒
+      case e: RuntimeException =>
         logger.warn(s"Application setup failed: ${e.getMessage}")
         application.application.dataDebitId.map(dataDebitService.dataDebitDisable(_, cancelAtPeriodEnd = false)(hat))
           .getOrElse(Future.successful(()))
-          .map(_ ⇒ throw e)
+          .map(_ => throw e)
     }
   }
 
   def disable(application: HatApplication)(implicit hat: HatServer, user: HatUser, requestHeader: RequestHeader): Future[HatApplication] = {
     for {
-      _ ← application.application.dataDebitId.map(dataDebitService.dataDebitDisable(_, cancelAtPeriodEnd = false)(hat))
+      _ <- application.application.dataDebitId.map(dataDebitService.dataDebitDisable(_, cancelAtPeriodEnd = false)(hat))
         .getOrElse(Future.successful(())) // If data debit was there, disable
       _ <- applicationSetupStatusUpdate(application, enabled = false)(hat.db) // Update status
       app <- applicationStatus(application.application.id, bustCache = true) // Refetch all information
@@ -210,7 +210,7 @@ class ApplicationsService @Inject() (
   }
 
   private def mostRecentDataTime(app: Application)(implicit hat: HatServer): Future[Option[DateTime]] = {
-    app.status.recentDataCheckEndpoint map { endpoint ⇒
+    app.status.recentDataCheckEndpoint map { endpoint =>
       richDataService.propertyDataMostRecentDate(Seq(EndpointQuery(endpoint, None, None, None)))(hat.db)
     } getOrElse {
       Future.successful(None)
